@@ -58,7 +58,7 @@ class CompilerApiTests(unittest.TestCase):
         )
 
         self.assertEqual(status_code, 200)
-        self.assertEqual(headers.get("access-control-allow-origin"), "http://127.0.0.1:3000")
+        self.assertEqual(headers.get("access-control-allow-origin"), "*")
         self.assertIn("POST", headers.get("access-control-allow-methods", ""))
 
     def test_validate_returns_topological_order_and_shapes(self) -> None:
