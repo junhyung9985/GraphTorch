@@ -15,6 +15,13 @@ import {
   toBackendGraph,
   toDiagramJson,
 } from "../lib/graph.js";
+import {
+  EXPORT_PADDING,
+  EXPORT_FILENAME,
+  buildPaperSvg,
+  computeExportBounds,
+  validateExportableGraph,
+} from "../lib/export-svg.js";
 import { createPresetEditorState, PRESETS } from "../lib/presets.js";
 
 test("toBackendGraph serializes Input and Output names only", () => {
@@ -164,4 +171,45 @@ test("fromDiagramJson validates required diagram fields before applying", () => 
   assert.throws(() => fromDiagramJson("{}"), /nodes must be an array/i);
   assert.throws(() => fromDiagramJson('{"nodes":[],"edges":[{}]}'), /edge at index 0/i);
   assert.throws(() => fromDiagramJson('{"nodes":[{}],"edges":[]}'), /node at index 0/i);
+});
+
+test("validateExportableGraph rejects empty graphs", () => {
+  assert.equal(validateExportableGraph([]), false);
+  assert.equal(validateExportableGraph(createPresetEditorState("basic_cnn").nodes), true);
+});
+
+test("computeExportBounds uses fitted graph bounds with fixed padding", () => {
+  const bounds = computeExportBounds([
+    { id: "a", position: { x: 100, y: 50 }, width: 200, height: 80 },
+    { id: "b", position: { x: 420, y: 220 }, width: 180, height: 64 },
+  ]);
+
+  assert.equal(bounds.padding, EXPORT_PADDING);
+  assert.equal(bounds.x, 100 - EXPORT_PADDING);
+  assert.equal(bounds.y, 50 - EXPORT_PADDING);
+  assert.equal(bounds.width, 420 + 180 - 100 + EXPORT_PADDING * 2);
+  assert.equal(bounds.height, 220 + 64 - 50 + EXPORT_PADDING * 2);
+});
+
+test("export filename stays deterministic", () => {
+  assert.equal(EXPORT_FILENAME, "graphtorch-diagram.svg");
+});
+
+test("buildPaperSvg renders clean paper boxes with type-only labels", () => {
+  const state = createPresetEditorState("basic_cnn");
+  const bounds = computeExportBounds(state.nodes);
+  const svg = buildPaperSvg({
+    nodes: state.nodes,
+    edges: state.edges,
+    bounds,
+  });
+
+  assert.match(svg, /<svg[\s\S]*viewBox=/);
+  assert.match(svg, />Input</);
+  assert.match(svg, />Conv2d</);
+  assert.match(svg, />Output</);
+  assert.doesNotMatch(svg, /input_1/);
+  assert.doesNotMatch(svg, /output_1/);
+  assert.doesNotMatch(svg, /export tensor/);
+  assert.match(svg, /<path/);
 });

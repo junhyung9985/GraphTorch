@@ -21,6 +21,7 @@ import {
   getEdgeInspector,
   getNextSelectionAfterNodeDelete,
 } from "@/lib/editor-state";
+import { exportGraphToSvg, validateExportableGraph } from "@/lib/export-svg";
 import { fromDiagramJson, toBackendGraph, toDiagramJson } from "@/lib/graph";
 import { createPresetEditorState, DEFAULT_PRESET_KEY, PRESET_LIST } from "@/lib/presets";
 import { GraphNode } from "./graph-node";
@@ -88,6 +89,7 @@ export function GraphEditor() {
   const [paletteWidth, setPaletteWidth] = useState(280);
   const [resultsWidth, setResultsWidth] = useState(380);
   const [activeResize, setActiveResize] = useState(null);
+  const [exportError, setExportError] = useState("");
 
   const selectedNode = useMemo(
     () => {
@@ -431,6 +433,24 @@ export function GraphEditor() {
     }
   }, [applyLoadedGraph, closeJsonModal, jsonModalValue]);
 
+  const handleExportSvg = useCallback(() => {
+    setExportError("");
+
+    if (!validateExportableGraph(nodes)) {
+      setExportError("Nothing to export");
+      return;
+    }
+
+    try {
+      exportGraphToSvg({
+        nodes,
+        edges,
+      });
+    } catch (error) {
+      setExportError(error.message || "SVG export failed");
+    }
+  }, [edges, nodes]);
+
   const flowNodes = useMemo(() => nodes, [nodes]);
   const showInspector = Boolean(selectedNode || selectedEdge);
 
@@ -500,6 +520,14 @@ export function GraphEditor() {
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
+            onClick={handleExportSvg}
+            disabled={!nodes.length}
+            className="rounded-2xl border border-border bg-white px-4 py-2.5 text-sm font-medium text-ink transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Export SVG
+          </button>
+          <button
+            type="button"
             onClick={openSaveJson}
             className="rounded-2xl border border-border bg-white px-4 py-2.5 text-sm font-medium text-ink transition hover:border-slate-300 hover:bg-slate-50"
           >
@@ -530,6 +558,12 @@ export function GraphEditor() {
           </button>
         </div>
       </header>
+
+      {exportError ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-panel">
+          {exportError}
+        </div>
+      ) : null}
 
       <section className="relative overflow-hidden rounded-xl2 border border-border bg-white shadow-panel">
         <div className="border-b border-border px-4 py-3">

@@ -11,6 +11,7 @@ export function GraphNode({ data, id, type, selected }) {
 
   return (
     <div
+      data-export-node="true"
       className={`min-w-[190px] max-w-[220px] rounded-[16px] border bg-white px-4 py-3 shadow-node transition ${
         selected ? "border-blue-400 shadow-selected" : "border-slate-200"
       }`}
