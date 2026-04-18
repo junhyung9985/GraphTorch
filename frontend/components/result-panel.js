@@ -1,7 +1,20 @@
 "use client";
 
+import { useState } from "react";
+
 export function ResultPanel({ topologicalOrder, shapes, code, errorDetail }) {
   const hasResults = topologicalOrder.length > 0 || Object.keys(shapes).length > 0 || Boolean(code);
+  const [copyStatus, setCopyStatus] = useState("");
+
+  async function handleCopyCode() {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopyStatus("Copied");
+    } catch {
+      setCopyStatus("Copy failed");
+    }
+  }
 
   return (
     <section className="rounded-xl2 border border-border bg-panel p-4 shadow-panel">
@@ -21,7 +34,20 @@ export function ResultPanel({ topologicalOrder, shapes, code, errorDetail }) {
       ) : (
         <div className="mt-4 space-y-4">
           <div className="rounded-2xl border border-border bg-slate-50/70 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Generated Code</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Generated Code</p>
+              <div className="flex items-center gap-2">
+                {copyStatus ? <span className="text-xs text-muted">{copyStatus}</span> : null}
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  disabled={!code}
+                  className="rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Copy Code
+                </button>
+              </div>
+            </div>
             <pre className="mt-2 max-h-80 overflow-auto rounded-2xl bg-[#0f172a] p-4 text-xs leading-6 text-slate-100">
               {code || "# Run compile to generate PyTorch code"}
             </pre>
