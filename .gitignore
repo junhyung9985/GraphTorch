@@ -1,0 +1,16 @@
+__pycache__/
+venv/
+.env
+node_modules/
+# frontend
+node_modules/
+.next/
+.env.local
+
+# backend
+__pycache__/
+*.pyc
+
+# 공통
+.env
+.DS_Store

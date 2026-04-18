@@ -1,0 +1,55 @@
+{
+  "nodes": [
+    {
+      "id": "input_image",
+      "type": "Input",
+      "name": "image",
+      "params": {
+        "shape": [1, 3, 32, 32]
+      }
+    },
+    {
+      "id": "input_aux",
+      "type": "Input",
+      "name": "aux",
+      "params": {
+        "shape": [1, 3, 32, 32]
+      }
+    },
+    {
+      "id": "merge",
+      "type": "Add",
+      "params": {}
+    },
+    {
+      "id": "output_main",
+      "type": "Output",
+      "name": "main",
+      "params": {}
+    },
+    {
+      "id": "output_skip",
+      "type": "Output",
+      "name": "skip",
+      "params": {}
+    }
+  ],
+  "edges": [
+    {
+      "source": "input_image",
+      "target": "merge"
+    },
+    {
+      "source": "input_aux",
+      "target": "merge"
+    },
+    {
+      "source": "merge",
+      "target": "output_main"
+    },
+    {
+      "source": "input_aux",
+      "target": "output_skip"
+    }
+  ]
+}
