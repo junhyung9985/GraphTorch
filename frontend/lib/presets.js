@@ -501,6 +501,93 @@ function createResNetPreset() {
   };
 }
 
+function createStackedLstmPreset() {
+  const specs = [
+    { id: "input_1", type: "Input", data: { name: "tokens", params: { shape: [4, 20, 128] } } },
+    {
+      id: "lstm_1",
+      type: "LSTM",
+      data: { params: { input_size: 128, hidden_size: 256, num_layers: 3, batch_first: 1, bidirectional: 0 } },
+    },
+    { id: "layernorm_1", type: "LayerNorm", data: { params: { normalized_shape: [256] } } },
+    { id: "dropout_1", type: "Dropout", data: { params: { p: 0.3 } } },
+    { id: "output_1", type: "Output", data: { name: "encoded", params: {} } },
+  ];
+
+  return {
+    key: "stacked_lstm",
+    label: "Stacked LSTM",
+    description:
+      "A compact stacked-LSTM encoder example using one black-box LSTM node with multiple layers, followed by light normalization and dropout.",
+    nodes: sequentialNodes(specs, { startX: 80, startY: 220, gap: 190 }),
+    edges: sequentialEdges(specs.map((spec) => spec.id), "stacked-lstm"),
+  };
+}
+
+function createSeq2SeqLstmPreset() {
+  const nodes = [
+    node("source_1", "Input", 80, 140, { name: "source", params: { shape: [4, 20, 128] } }),
+    node("target_1", "Input", 80, 340, { name: "target", params: { shape: [4, 20, 128] } }),
+    node("encoder_lstm", "LSTM", 320, 140, {
+      params: { input_size: 128, hidden_size: 128, num_layers: 2, batch_first: 1, bidirectional: 1 },
+    }),
+    node("merge_context", "Concat", 560, 240, { params: { dim: 2 } }),
+    node("decoder_lstm", "LSTM", 800, 240, {
+      params: { input_size: 384, hidden_size: 256, num_layers: 1, batch_first: 1, bidirectional: 0 },
+    }),
+    node("layernorm_1", "LayerNorm", 1040, 240, { params: { normalized_shape: [256] } }),
+    node("output_1", "Output", 1280, 240, { name: "decoded", params: {} }),
+  ];
+
+  return {
+    key: "seq2seq_lstm",
+    label: "Seq2Seq (LSTM)",
+    description:
+      "A high-level encoder-decoder LSTM sketch. The encoder path is merged with teacher-forced target tokens before a compact decoder LSTM.",
+    nodes,
+    edges: [
+      edge("e-seq2seq-source-encoder", "source_1", "encoder_lstm"),
+      edge("e-seq2seq-encoder-merge", "encoder_lstm", "merge_context"),
+      edge("e-seq2seq-target-merge", "target_1", "merge_context"),
+      edge("e-seq2seq-merge-decoder", "merge_context", "decoder_lstm"),
+      edge("e-seq2seq-decoder-norm", "decoder_lstm", "layernorm_1"),
+      edge("e-seq2seq-norm-output", "layernorm_1", "output_1"),
+    ],
+  };
+}
+
+function createEncoderDecoderGruPreset() {
+  const nodes = [
+    node("source_1", "Input", 80, 140, { name: "source", params: { shape: [4, 20, 128] } }),
+    node("target_1", "Input", 80, 340, { name: "target", params: { shape: [4, 20, 128] } }),
+    node("encoder_gru", "GRU", 320, 140, {
+      params: { input_size: 128, hidden_size: 128, num_layers: 2, batch_first: 1, bidirectional: 1 },
+    }),
+    node("merge_context", "Concat", 560, 240, { params: { dim: 2 } }),
+    node("decoder_gru", "GRU", 800, 240, {
+      params: { input_size: 384, hidden_size: 128, num_layers: 1, batch_first: 1, bidirectional: 0 },
+    }),
+    node("layernorm_1", "LayerNorm", 1040, 240, { params: { normalized_shape: [128] } }),
+    node("output_1", "Output", 1280, 240, { name: "decoded", params: {} }),
+  ];
+
+  return {
+    key: "encoder_decoder_gru",
+    label: "Encoder-Decoder (GRU)",
+    description:
+      "A compact GRU encoder-decoder example with encoder context concatenated into the decoder input, staying compatible with the current DAG model.",
+    nodes,
+    edges: [
+      edge("e-gru-source-encoder", "source_1", "encoder_gru"),
+      edge("e-gru-encoder-merge", "encoder_gru", "merge_context"),
+      edge("e-gru-target-merge", "target_1", "merge_context"),
+      edge("e-gru-merge-decoder", "merge_context", "decoder_gru"),
+      edge("e-gru-decoder-norm", "decoder_gru", "layernorm_1"),
+      edge("e-gru-norm-output", "layernorm_1", "output_1"),
+    ],
+  };
+}
+
 export const PRESETS = {
   ...createSmallPresets(),
   lenet: createLeNetPreset(),
@@ -508,6 +595,9 @@ export const PRESETS = {
   vggnet: createVggPreset(),
   googlenet: createGoogLeNetPreset(),
   resnet: createResNetPreset(),
+  stacked_lstm: createStackedLstmPreset(),
+  seq2seq_lstm: createSeq2SeqLstmPreset(),
+  encoder_decoder_gru: createEncoderDecoderGruPreset(),
 };
 
 export const PRESET_LIST = Object.values(PRESETS);

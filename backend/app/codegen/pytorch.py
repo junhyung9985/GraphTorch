@@ -43,7 +43,10 @@ class PyTorchCodeGenerator:
             parent_tensors = [tensor_names[parent_id] for parent_id in incoming[node.id]]
 
             if node.type in MODULE_NODE_TYPES:
-                forward_lines.append(f"{target_name} = self.{module_names[node.id]}({parent_tensors[0]})")
+                if node.type in {"LSTM", "GRU"}:
+                    forward_lines.append(f"{target_name} = self.{module_names[node.id]}({parent_tensors[0]})[0]")
+                else:
+                    forward_lines.append(f"{target_name} = self.{module_names[node.id]}({parent_tensors[0]})")
             elif node.type == "Add":
                 forward_lines.append(f"{target_name} = {' + '.join(parent_tensors)}")
             elif node.type == "Concat":
@@ -90,6 +93,10 @@ class PyTorchCodeGenerator:
             return self._nn_call("Linear", node.params)
         if node.type == "BatchNorm2d":
             return self._nn_call("BatchNorm2d", node.params)
+        if node.type == "LayerNorm":
+            return self._nn_call("LayerNorm", node.params)
+        if node.type in {"LSTM", "GRU"}:
+            return self._sequence_call(node.type, node.params)
         if node.type == "ReLU":
             return self._nn_call("ReLU", node.params)
         if node.type == "Dropout":
@@ -109,6 +116,15 @@ class PyTorchCodeGenerator:
     def _nn_call(self, class_name: str, params: dict[str, object]) -> str:
         rendered_params = ", ".join(f"{key}={repr(value)}" for key, value in params.items())
         return f"nn.{class_name}({rendered_params})"
+
+    def _sequence_call(self, class_name: str, params: dict[str, object]) -> str:
+        rendered = []
+        for key, value in params.items():
+            if key in {"batch_first", "bidirectional"}:
+                rendered.append(f"{key}={bool(value)}")
+            else:
+                rendered.append(f"{key}={repr(value)}")
+        return f"nn.{class_name}({', '.join(rendered)})"
 
     def _base_name(self, raw_value: str) -> str:
         sanitized = re.sub(r"\W+", "_", raw_value).strip("_").lower()

@@ -1,22 +1,35 @@
 export const NODE_DEFINITIONS = [
-  { type: "Input", category: "input" },
-  { type: "Conv2d", category: "module" },
-  { type: "Linear", category: "module" },
-  { type: "BatchNorm2d", category: "module" },
-  { type: "ReLU", category: "module" },
-  { type: "Dropout", category: "module" },
-  { type: "LocalResponseNorm", category: "module" },
-  { type: "MaxPool2d", category: "module" },
-  { type: "AvgPool2d", category: "module" },
-  { type: "AdaptiveAvgPool2d", category: "module" },
-  { type: "Identity", category: "module" },
+  { type: "Input", category: "io" },
+  { type: "Output", category: "io" },
+  { type: "Conv2d", category: "layers" },
+  { type: "Linear", category: "layers" },
+  { type: "Dropout", category: "layers" },
+  { type: "Identity", category: "layers" },
+  { type: "BatchNorm2d", category: "normalization" },
+  { type: "LayerNorm", category: "normalization" },
+  { type: "LocalResponseNorm", category: "normalization" },
+  { type: "ReLU", category: "activation" },
+  { type: "Softmax", category: "activation" },
+  { type: "MaxPool2d", category: "pooling" },
+  { type: "AvgPool2d", category: "pooling" },
+  { type: "AdaptiveAvgPool2d", category: "pooling" },
+  { type: "LSTM", category: "sequence" },
+  { type: "GRU", category: "sequence" },
   { type: "Add", category: "functional" },
   { type: "Concat", category: "functional" },
   { type: "Flatten", category: "functional" },
   { type: "Reshape", category: "functional" },
   { type: "Permute", category: "functional" },
-  { type: "Softmax", category: "functional" },
-  { type: "Output", category: "input" },
+];
+
+export const PALETTE_CATEGORIES = [
+  { key: "io", label: "I/O" },
+  { key: "layers", label: "Layers" },
+  { key: "normalization", label: "Normalization" },
+  { key: "activation", label: "Activation" },
+  { key: "pooling", label: "Pooling" },
+  { key: "sequence", label: "Sequence" },
+  { key: "functional", label: "Functional" },
 ];
 
 export function getDefaultParams(type, index = 1) {
@@ -33,6 +46,11 @@ export function getDefaultParams(type, index = 1) {
       return { params: { in_features: 128, out_features: 64 } };
     case "BatchNorm2d":
       return { params: { num_features: 16 } };
+    case "LayerNorm":
+      return { params: { normalized_shape: [64] } };
+    case "LSTM":
+    case "GRU":
+      return { params: { input_size: 128, hidden_size: 128, num_layers: 1, batch_first: 1, bidirectional: 0 } };
     case "ReLU":
       return { params: {} };
     case "Dropout":
@@ -64,7 +82,13 @@ export function getDefaultParams(type, index = 1) {
 }
 
 export function getCategory(type) {
-  if (type === "Input" || type === "Output") return "input";
-  if (["Add", "Concat", "Flatten", "Reshape", "Permute", "Softmax"].includes(type)) return "functional";
-  return "module";
+  const definition = NODE_DEFINITIONS.find((item) => item.type === type);
+  return definition?.category ?? "layers";
+}
+
+export function getNodesByCategory() {
+  return PALETTE_CATEGORIES.map((section) => ({
+    ...section,
+    items: NODE_DEFINITIONS.filter((definition) => definition.category === section.key),
+  }));
 }

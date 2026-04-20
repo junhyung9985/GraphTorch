@@ -22,7 +22,7 @@ import {
   computeExportBounds,
   validateExportableGraph,
 } from "../lib/export-svg.js";
-import { getDefaultParams } from "../lib/defaults.js";
+import { getDefaultParams, getNodesByCategory } from "../lib/defaults.js";
 import { createPresetEditorState, PRESETS } from "../lib/presets.js";
 
 test("toBackendGraph serializes Input and Output names only", () => {
@@ -112,9 +112,37 @@ test("node presentation helpers stay compact for cards", () => {
     }),
     "dim=1"
   );
+  assert.equal(
+    getNodeSummary({
+      type: "LayerNorm",
+      data: { params: { normalized_shape: [64] } },
+    }),
+    "norm=[64]"
+  );
+  assert.equal(
+    getNodeSummary({
+      type: "LSTM",
+      data: { params: { input_size: 128, hidden_size: 256, num_layers: 2 } },
+    }),
+    "128→256, layers=2"
+  );
+  assert.equal(
+    getNodeSummary({
+      type: "GRU",
+      data: { params: { input_size: 256, hidden_size: 128, num_layers: 1 } },
+    }),
+    "256→128, layers=1"
+  );
 });
 
 test("new node types expose sensible default params", () => {
+  assert.deepEqual(getDefaultParams("LayerNorm"), { params: { normalized_shape: [64] } });
+  assert.deepEqual(getDefaultParams("LSTM"), {
+    params: { input_size: 128, hidden_size: 128, num_layers: 1, batch_first: 1, bidirectional: 0 },
+  });
+  assert.deepEqual(getDefaultParams("GRU"), {
+    params: { input_size: 128, hidden_size: 128, num_layers: 1, batch_first: 1, bidirectional: 0 },
+  });
   assert.deepEqual(getDefaultParams("Dropout"), { params: { p: 0.5 } });
   assert.deepEqual(getDefaultParams("LocalResponseNorm"), {
     params: { size: 5, alpha: 0.0001, beta: 0.75, k: 1 },
@@ -124,6 +152,17 @@ test("new node types expose sensible default params", () => {
   });
   assert.deepEqual(getDefaultParams("Identity"), { params: {} });
   assert.deepEqual(getDefaultParams("Softmax"), { params: { dim: 1 } });
+});
+
+test("node palette categories expose ordered accordion sections", () => {
+  const sections = getNodesByCategory();
+
+  assert.deepEqual(
+    sections.map((section) => section.key),
+    ["io", "layers", "normalization", "activation", "pooling", "sequence", "functional"]
+  );
+  assert.ok(sections.find((section) => section.key === "sequence").items.some((item) => item.type === "LSTM"));
+  assert.ok(sections.find((section) => section.key === "sequence").items.some((item) => item.type === "GRU"));
 });
 
 test("createPresetEditorState replaces the full graph and clears prior results", () => {
@@ -150,6 +189,9 @@ test("presets expose graph definitions with nodes and edges", () => {
     "vggnet",
     "googlenet",
     "resnet",
+    "stacked_lstm",
+    "seq2seq_lstm",
+    "encoder_decoder_gru",
   ]);
   assert.ok(Array.isArray(PRESETS.lenet.nodes));
   assert.ok(Array.isArray(PRESETS.lenet.edges));
@@ -163,6 +205,9 @@ test("presets expose graph definitions with nodes and edges", () => {
   assert.equal(PRESETS.googlenet_small.nodes.filter((node) => node.type === "Concat").length, 1);
   assert.equal(PRESETS.resnet.nodes.filter((node) => node.type === "Add").length, 16);
   assert.equal(PRESETS.resnet_small.nodes.filter((node) => node.type === "Add").length, 1);
+  assert.ok(PRESETS.stacked_lstm.nodes.some((node) => node.type === "LSTM"));
+  assert.ok(PRESETS.seq2seq_lstm.nodes.some((node) => node.type === "Concat"));
+  assert.ok(PRESETS.encoder_decoder_gru.nodes.some((node) => node.type === "GRU"));
 });
 
 test("alexnet and vggnet classifier heads match flattened feature size", () => {
