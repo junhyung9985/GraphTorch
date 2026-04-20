@@ -57,6 +57,8 @@ class PyTorchCodeGenerator:
             elif node.type == "Permute":
                 dims = ", ".join(str(value) for value in node.params["dims"])
                 forward_lines.append(f"{target_name} = {parent_tensors[0]}.permute({dims})")
+            elif node.type == "Softmax":
+                forward_lines.append(f"{target_name} = torch.softmax({parent_tensors[0]}, dim={int(node.params['dim'])})")
 
         output_entries = []
         for node in output_nodes:
@@ -90,10 +92,18 @@ class PyTorchCodeGenerator:
             return self._nn_call("BatchNorm2d", node.params)
         if node.type == "ReLU":
             return self._nn_call("ReLU", node.params)
+        if node.type == "Dropout":
+            return self._nn_call("Dropout", node.params)
+        if node.type == "LocalResponseNorm":
+            return self._nn_call("LocalResponseNorm", node.params)
         if node.type == "MaxPool2d":
             return self._nn_call("MaxPool2d", node.params)
         if node.type == "AvgPool2d":
             return self._nn_call("AvgPool2d", node.params)
+        if node.type == "AdaptiveAvgPool2d":
+            return self._nn_call("AdaptiveAvgPool2d", node.params)
+        if node.type == "Identity":
+            return self._nn_call("Identity", node.params)
         raise ValueError(f"Unsupported module node type '{node.type}'")
 
     def _nn_call(self, class_name: str, params: dict[str, object]) -> str:

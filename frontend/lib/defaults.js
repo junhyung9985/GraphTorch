@@ -4,13 +4,18 @@ export const NODE_DEFINITIONS = [
   { type: "Linear", category: "module" },
   { type: "BatchNorm2d", category: "module" },
   { type: "ReLU", category: "module" },
+  { type: "Dropout", category: "module" },
+  { type: "LocalResponseNorm", category: "module" },
   { type: "MaxPool2d", category: "module" },
   { type: "AvgPool2d", category: "module" },
+  { type: "AdaptiveAvgPool2d", category: "module" },
+  { type: "Identity", category: "module" },
   { type: "Add", category: "functional" },
   { type: "Concat", category: "functional" },
   { type: "Flatten", category: "functional" },
   { type: "Reshape", category: "functional" },
   { type: "Permute", category: "functional" },
+  { type: "Softmax", category: "functional" },
   { type: "Output", category: "input" },
 ];
 
@@ -30,9 +35,17 @@ export function getDefaultParams(type, index = 1) {
       return { params: { num_features: 16 } };
     case "ReLU":
       return { params: {} };
+    case "Dropout":
+      return { params: { p: 0.5 } };
+    case "LocalResponseNorm":
+      return { params: { size: 5, alpha: 0.0001, beta: 0.75, k: 1 } };
     case "MaxPool2d":
     case "AvgPool2d":
       return { params: { kernel_size: 2, stride: 2, padding: 0 } };
+    case "AdaptiveAvgPool2d":
+      return { params: { output_size: [1, 1] } };
+    case "Identity":
+      return { params: {} };
     case "Add":
       return { params: {} };
     case "Concat":
@@ -43,6 +56,8 @@ export function getDefaultParams(type, index = 1) {
       return { params: { shape: [1, 128] } };
     case "Permute":
       return { params: { dims: [0, 2, 3, 1] } };
+    case "Softmax":
+      return { params: { dim: 1 } };
     default:
       return { params: {} };
   }
@@ -50,6 +65,6 @@ export function getDefaultParams(type, index = 1) {
 
 export function getCategory(type) {
   if (type === "Input" || type === "Output") return "input";
-  if (["Add", "Concat", "Flatten", "Reshape", "Permute"].includes(type)) return "functional";
+  if (["Add", "Concat", "Flatten", "Reshape", "Permute", "Softmax"].includes(type)) return "functional";
   return "module";
 }

@@ -36,13 +36,18 @@ const nodeTypes = {
   Linear: GraphNode,
   BatchNorm2d: GraphNode,
   ReLU: GraphNode,
+  Dropout: GraphNode,
+  LocalResponseNorm: GraphNode,
   MaxPool2d: GraphNode,
   AvgPool2d: GraphNode,
+  AdaptiveAvgPool2d: GraphNode,
+  Identity: GraphNode,
   Add: GraphNode,
   Concat: GraphNode,
   Flatten: GraphNode,
   Reshape: GraphNode,
   Permute: GraphNode,
+  Softmax: GraphNode,
   Output: GraphNode,
 };
 

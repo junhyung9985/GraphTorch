@@ -22,6 +22,7 @@ import {
   computeExportBounds,
   validateExportableGraph,
 } from "../lib/export-svg.js";
+import { getDefaultParams } from "../lib/defaults.js";
 import { createPresetEditorState, PRESETS } from "../lib/presets.js";
 
 test("toBackendGraph serializes Input and Output names only", () => {
@@ -83,6 +84,46 @@ test("node presentation helpers stay compact for cards", () => {
     }),
     "3→16, k=3, s=1"
   );
+  assert.equal(
+    getNodeSummary({
+      type: "AdaptiveAvgPool2d",
+      data: { params: { output_size: [1, 1] } },
+    }),
+    "out=[1, 1]"
+  );
+  assert.equal(
+    getNodeSummary({
+      type: "LocalResponseNorm",
+      data: { params: { size: 5 } },
+    }),
+    "size=5"
+  );
+  assert.equal(
+    getNodeSummary({
+      type: "Dropout",
+      data: { params: { p: 0.5 } },
+    }),
+    "p=0.5"
+  );
+  assert.equal(
+    getNodeSummary({
+      type: "Softmax",
+      data: { params: { dim: 1 } },
+    }),
+    "dim=1"
+  );
+});
+
+test("new node types expose sensible default params", () => {
+  assert.deepEqual(getDefaultParams("Dropout"), { params: { p: 0.5 } });
+  assert.deepEqual(getDefaultParams("LocalResponseNorm"), {
+    params: { size: 5, alpha: 0.0001, beta: 0.75, k: 1 },
+  });
+  assert.deepEqual(getDefaultParams("AdaptiveAvgPool2d"), {
+    params: { output_size: [1, 1] },
+  });
+  assert.deepEqual(getDefaultParams("Identity"), { params: {} });
+  assert.deepEqual(getDefaultParams("Softmax"), { params: { dim: 1 } });
 });
 
 test("createPresetEditorState replaces the full graph and clears prior results", () => {
@@ -98,19 +139,45 @@ test("createPresetEditorState replaces the full graph and clears prior results",
 });
 
 test("presets expose graph definitions with nodes and edges", () => {
-  assert.deepEqual(Object.keys(PRESETS), ["lenet", "alexnet", "vggnet", "googlenet", "resnet"]);
+  assert.deepEqual(Object.keys(PRESETS), [
+    "lenet_small",
+    "alexnet_small",
+    "vggnet_small",
+    "googlenet_small",
+    "resnet_small",
+    "lenet",
+    "alexnet",
+    "vggnet",
+    "googlenet",
+    "resnet",
+  ]);
   assert.ok(Array.isArray(PRESETS.lenet.nodes));
   assert.ok(Array.isArray(PRESETS.lenet.edges));
-  assert.ok(PRESETS.googlenet.nodes.some((node) => node.type === "Concat"));
-  assert.ok(PRESETS.resnet.nodes.some((node) => node.type === "Add"));
+  assert.ok(Array.isArray(PRESETS.lenet_small.nodes));
+  assert.ok(Array.isArray(PRESETS.lenet_small.edges));
+  assert.equal(PRESETS.alexnet.nodes.filter((node) => node.type === "LocalResponseNorm").length, 2);
+  assert.equal(PRESETS.alexnet_small.nodes.filter((node) => node.type === "LocalResponseNorm").length, 0);
+  assert.equal(PRESETS.vggnet.nodes.filter((node) => node.type === "Conv2d").length, 13);
+  assert.equal(PRESETS.vggnet_small.nodes.filter((node) => node.type === "Conv2d").length, 4);
+  assert.equal(PRESETS.googlenet.nodes.filter((node) => node.type === "Concat").length, 9);
+  assert.equal(PRESETS.googlenet_small.nodes.filter((node) => node.type === "Concat").length, 1);
+  assert.equal(PRESETS.resnet.nodes.filter((node) => node.type === "Add").length, 16);
+  assert.equal(PRESETS.resnet_small.nodes.filter((node) => node.type === "Add").length, 1);
 });
 
 test("alexnet and vggnet classifier heads match flattened feature size", () => {
   const alexLinear = PRESETS.alexnet.nodes.find((node) => node.id === "linear_1");
   const vggLinear = PRESETS.vggnet.nodes.find((node) => node.id === "linear_1");
 
-  assert.equal(alexLinear.data.params.in_features, 43264);
-  assert.equal(vggLinear.data.params.in_features, 401408);
+  assert.equal(alexLinear.data.params.in_features, 9216);
+  assert.equal(vggLinear.data.params.in_features, 25088);
+});
+
+test("googlenet and resnet presets use the new architecture nodes", () => {
+  assert.ok(PRESETS.googlenet.nodes.some((node) => node.type === "AdaptiveAvgPool2d"));
+  assert.ok(PRESETS.googlenet.nodes.some((node) => node.type === "Dropout"));
+  assert.ok(PRESETS.resnet.nodes.some((node) => node.type === "Identity"));
+  assert.ok(PRESETS.resnet.nodes.some((node) => node.type === "BatchNorm2d"));
 });
 
 test("deleting a node also removes its connected edges and clears matching selection", () => {
@@ -136,14 +203,18 @@ test("edge helpers expose inspector data and allow deletion by id", () => {
 
 test("copySelectionToClipboard keeps only selected nodes and internal edges", () => {
   const state = createPresetEditorState("resnet");
-  const clipboard = copySelectionToClipboard(state.nodes, state.edges, ["conv_2", "relu_1", "conv_3"]);
+  const clipboard = copySelectionToClipboard(state.nodes, state.edges, [
+    "stage2_block1_conv1",
+    "stage2_block1_bn1",
+    "stage2_block1_relu1",
+  ]);
 
   assert.equal(clipboard.nodes.length, 3);
   assert.deepEqual(
     clipboard.edges.map((edge) => [edge.source, edge.target]),
     [
-      ["conv_2", "relu_1"],
-      ["relu_1", "conv_3"],
+      ["stage2_block1_conv1", "stage2_block1_bn1"],
+      ["stage2_block1_bn1", "stage2_block1_relu1"],
     ]
   );
 });
