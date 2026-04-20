@@ -86,7 +86,7 @@ test("node presentation helpers stay compact for cards", () => {
 });
 
 test("createPresetEditorState replaces the full graph and clears prior results", () => {
-  const state = createPresetEditorState("residual_block");
+  const state = createPresetEditorState("resnet");
 
   assert.equal(state.selectedNodeId, null);
   assert.equal(state.errorDetail, "");
@@ -98,14 +98,23 @@ test("createPresetEditorState replaces the full graph and clears prior results",
 });
 
 test("presets expose graph definitions with nodes and edges", () => {
-  assert.ok(PRESETS.basic_cnn);
-  assert.ok(PRESETS.residual_block);
-  assert.ok(Array.isArray(PRESETS.basic_cnn.nodes));
-  assert.ok(Array.isArray(PRESETS.basic_cnn.edges));
+  assert.deepEqual(Object.keys(PRESETS), ["lenet", "alexnet", "vggnet", "googlenet", "resnet"]);
+  assert.ok(Array.isArray(PRESETS.lenet.nodes));
+  assert.ok(Array.isArray(PRESETS.lenet.edges));
+  assert.ok(PRESETS.googlenet.nodes.some((node) => node.type === "Concat"));
+  assert.ok(PRESETS.resnet.nodes.some((node) => node.type === "Add"));
+});
+
+test("alexnet and vggnet classifier heads match flattened feature size", () => {
+  const alexLinear = PRESETS.alexnet.nodes.find((node) => node.id === "linear_1");
+  const vggLinear = PRESETS.vggnet.nodes.find((node) => node.id === "linear_1");
+
+  assert.equal(alexLinear.data.params.in_features, 43264);
+  assert.equal(vggLinear.data.params.in_features, 401408);
 });
 
 test("deleting a node also removes its connected edges and clears matching selection", () => {
-  const state = createPresetEditorState("basic_cnn");
+  const state = createPresetEditorState("lenet");
   const next = deleteNodeAndConnectedEdges(state.nodes, state.edges, "conv_1");
 
   assert.equal(next.nodes.some((node) => node.id === "conv_1"), false);
@@ -114,7 +123,7 @@ test("deleting a node also removes its connected edges and clears matching selec
 });
 
 test("edge helpers expose inspector data and allow deletion by id", () => {
-  const state = createPresetEditorState("basic_cnn");
+  const state = createPresetEditorState("lenet");
   const firstEdge = state.edges[0];
 
   assert.deepEqual(getEdgeInspector(firstEdge), {
@@ -126,21 +135,21 @@ test("edge helpers expose inspector data and allow deletion by id", () => {
 });
 
 test("copySelectionToClipboard keeps only selected nodes and internal edges", () => {
-  const state = createPresetEditorState("residual_block");
-  const clipboard = copySelectionToClipboard(state.nodes, state.edges, ["conv_1", "relu_1", "conv_2"]);
+  const state = createPresetEditorState("resnet");
+  const clipboard = copySelectionToClipboard(state.nodes, state.edges, ["conv_2", "relu_1", "conv_3"]);
 
   assert.equal(clipboard.nodes.length, 3);
   assert.deepEqual(
     clipboard.edges.map((edge) => [edge.source, edge.target]),
     [
-      ["conv_1", "relu_1"],
-      ["relu_1", "conv_2"],
+      ["conv_2", "relu_1"],
+      ["relu_1", "conv_3"],
     ]
   );
 });
 
 test("pasteClipboardSelection duplicates nodes with new ids and shifted positions", () => {
-  const state = createPresetEditorState("basic_cnn");
+  const state = createPresetEditorState("lenet");
   const clipboard = copySelectionToClipboard(state.nodes, state.edges, ["conv_1"]);
   const pasted = pasteClipboardSelection(state.nodes, state.edges, clipboard);
 
@@ -156,7 +165,7 @@ test("pasteClipboardSelection duplicates nodes with new ids and shifted position
 });
 
 test("toDiagramJson preserves graph structure and positions without transient UI state", () => {
-  const state = createPresetEditorState("basic_cnn");
+  const state = createPresetEditorState("lenet");
   const json = toDiagramJson(state.nodes, state.edges);
   const payload = JSON.parse(json);
 
@@ -175,7 +184,7 @@ test("fromDiagramJson validates required diagram fields before applying", () => 
 
 test("validateExportableGraph rejects empty graphs", () => {
   assert.equal(validateExportableGraph([]), false);
-  assert.equal(validateExportableGraph(createPresetEditorState("basic_cnn").nodes), true);
+  assert.equal(validateExportableGraph(createPresetEditorState("lenet").nodes), true);
 });
 
 test("computeExportBounds uses fitted graph bounds with fixed padding", () => {
@@ -196,7 +205,7 @@ test("export filename stays deterministic", () => {
 });
 
 test("buildPaperSvg renders clean paper boxes with type-only labels", () => {
-  const state = createPresetEditorState("basic_cnn");
+  const state = createPresetEditorState("lenet");
   const bounds = computeExportBounds(state.nodes);
   const svg = buildPaperSvg({
     nodes: state.nodes,
