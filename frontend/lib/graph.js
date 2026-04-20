@@ -107,9 +107,17 @@ export function getNodeSummary(node) {
       return `${params.in_features ?? "?"}\u2192${params.out_features ?? "?"}`;
     case "BatchNorm2d":
       return `features=${params.num_features ?? "?"}`;
+    case "Dropout":
+      return `p=${params.p ?? "?"}`;
+    case "LocalResponseNorm":
+      return `size=${params.size ?? "?"}`;
     case "MaxPool2d":
     case "AvgPool2d":
       return `k=${params.kernel_size ?? "?"}, s=${params.stride ?? params.kernel_size ?? "?"}`;
+    case "AdaptiveAvgPool2d":
+      return `out=${formatArray(params.output_size)}`;
+    case "Identity":
+      return "pass-through";
     case "Concat":
       return `dim=${params.dim ?? 1}`;
     case "Flatten":
@@ -118,6 +126,8 @@ export function getNodeSummary(node) {
       return formatArray(params.shape);
     case "Permute":
       return formatArray(params.dims);
+    case "Softmax":
+      return `dim=${params.dim ?? "?"}`;
     default:
       return "No params";
   }

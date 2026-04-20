@@ -16,25 +16,46 @@ SUPPORTED_NODE_TYPES = {
     "Linear",
     "BatchNorm2d",
     "ReLU",
+    "Dropout",
+    "LocalResponseNorm",
     "MaxPool2d",
     "AvgPool2d",
+    "AdaptiveAvgPool2d",
+    "Identity",
     "Add",
     "Concat",
     "Flatten",
     "Reshape",
     "Permute",
+    "Softmax",
 }
-MODULE_NODE_TYPES = {"Conv2d", "Linear", "BatchNorm2d", "ReLU", "MaxPool2d", "AvgPool2d"}
+MODULE_NODE_TYPES = {
+    "Conv2d",
+    "Linear",
+    "BatchNorm2d",
+    "ReLU",
+    "Dropout",
+    "LocalResponseNorm",
+    "MaxPool2d",
+    "AvgPool2d",
+    "AdaptiveAvgPool2d",
+    "Identity",
+}
 UNARY_NODE_TYPES = {
     "Conv2d",
     "Linear",
     "BatchNorm2d",
     "ReLU",
+    "Dropout",
+    "LocalResponseNorm",
     "MaxPool2d",
     "AvgPool2d",
+    "AdaptiveAvgPool2d",
+    "Identity",
     "Flatten",
     "Reshape",
     "Permute",
+    "Softmax",
 }
 
 
@@ -109,14 +130,20 @@ class GraphCompiler:
                 self._require_params(node, {"in_features", "out_features"})
             elif node.type == "BatchNorm2d":
                 self._require_params(node, {"num_features"})
+            elif node.type == "LocalResponseNorm":
+                self._require_params(node, {"size"})
             elif node.type in {"MaxPool2d", "AvgPool2d"}:
                 self._require_params(node, {"kernel_size"})
+            elif node.type == "AdaptiveAvgPool2d":
+                self._require_params(node, {"output_size"})
             elif node.type == "Concat":
                 self._require_params(node, {"dim"})
             elif node.type == "Reshape":
                 self._require_params(node, {"shape"})
             elif node.type == "Permute":
                 self._require_params(node, {"dims"})
+            elif node.type == "Softmax":
+                self._require_params(node, {"dim"})
 
     def _validate_edges(self, edges: list[Edge]) -> None:
         for edge in edges:
@@ -189,10 +216,12 @@ class GraphCompiler:
                 shapes[node_id] = self._infer_linear(node, parent_shapes[0])
             elif node.type == "BatchNorm2d":
                 shapes[node_id] = self._infer_batch_norm(node, parent_shapes[0])
-            elif node.type == "ReLU":
+            elif node.type in {"ReLU", "Dropout", "LocalResponseNorm", "Identity"}:
                 shapes[node_id] = parent_shapes[0]
             elif node.type in {"MaxPool2d", "AvgPool2d"}:
                 shapes[node_id] = self._infer_pool(node, parent_shapes[0])
+            elif node.type == "AdaptiveAvgPool2d":
+                shapes[node_id] = self._infer_adaptive_avg_pool(node, parent_shapes[0])
             elif node.type == "Add":
                 shapes[node_id] = self._infer_add(node, parent_shapes)
             elif node.type == "Concat":
@@ -203,6 +232,8 @@ class GraphCompiler:
                 shapes[node_id] = self._infer_reshape(node, parent_shapes[0])
             elif node.type == "Permute":
                 shapes[node_id] = self._infer_permute(node, parent_shapes[0])
+            elif node.type == "Softmax":
+                shapes[node_id] = self._infer_softmax(node, parent_shapes[0])
         return shapes
 
     def _infer_conv2d(self, node: Node, input_shape: Shape) -> Shape:
@@ -275,6 +306,13 @@ class GraphCompiler:
         output_shape[dim] = sum(shape[dim] for shape in input_shapes)
         return tuple(output_shape)
 
+    def _infer_adaptive_avg_pool(self, node: Node, input_shape: Shape) -> Shape:
+        if len(input_shape) != 4:
+            raise ShapeInferenceError(f"AdaptiveAvgPool2d node '{node.id}' expects a 4D input shape")
+        batch, channels, _, _ = input_shape
+        output_height, output_width = self._normalize_pair(node.params["output_size"], "output_size", node.id)
+        return (batch, channels, output_height, output_width)
+
     def _infer_flatten(self, node: Node, input_shape: Shape) -> Shape:
         start_dim = int(node.params.get("start_dim", 1))
         if start_dim < 0:
@@ -297,6 +335,10 @@ class GraphCompiler:
         if len(normalized_dims) != len(input_shape) or len(set(normalized_dims)) != len(input_shape):
             raise ShapeInferenceError(f"Permute node '{node.id}' must provide a full permutation of dimensions")
         return tuple(input_shape[index] for index in normalized_dims)
+
+    def _infer_softmax(self, node: Node, input_shape: Shape) -> Shape:
+        self._normalize_dim(int(node.params["dim"]), len(input_shape), node.id)
+        return input_shape
 
     def _require_params(self, node: Node, required_keys: set[str]) -> None:
         missing = [key for key in required_keys if key not in node.params]

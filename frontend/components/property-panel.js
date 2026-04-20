@@ -18,6 +18,13 @@ const PARAM_FIELDS = {
   ],
   BatchNorm2d: [{ key: "num_features", label: "Num Features", kind: "number" }],
   ReLU: [],
+  Dropout: [{ key: "p", label: "Drop Probability", kind: "number" }],
+  LocalResponseNorm: [
+    { key: "size", label: "Size", kind: "number" },
+    { key: "alpha", label: "Alpha", kind: "number" },
+    { key: "beta", label: "Beta", kind: "number" },
+    { key: "k", label: "K", kind: "number" },
+  ],
   MaxPool2d: [
     { key: "kernel_size", label: "Kernel Size", kind: "number" },
     { key: "stride", label: "Stride", kind: "number" },
@@ -28,11 +35,14 @@ const PARAM_FIELDS = {
     { key: "stride", label: "Stride", kind: "number" },
     { key: "padding", label: "Padding", kind: "number" },
   ],
+  AdaptiveAvgPool2d: [{ key: "output_size", label: "Output Size", kind: "array" }],
+  Identity: [],
   Add: [],
   Concat: [{ key: "dim", label: "Dim", kind: "number" }],
   Flatten: [{ key: "start_dim", label: "Start Dim", kind: "number" }],
   Reshape: [{ key: "shape", label: "Shape", kind: "array" }],
   Permute: [{ key: "dims", label: "Dims", kind: "array" }],
+  Softmax: [{ key: "dim", label: "Dim", kind: "number" }],
 };
 
 function InputField({ label, value, onChange, placeholder }) {

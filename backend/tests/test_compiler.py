@@ -42,6 +42,28 @@ MULTI_IO_GRAPH = {
     ],
 }
 
+EXTENDED_NODE_GRAPH = {
+    "nodes": [
+        {"id": "input_image", "type": "Input", "name": "image", "params": {"shape": [1, 64, 56, 56]}},
+        {"id": "norm_1", "type": "LocalResponseNorm", "params": {"size": 5, "alpha": 0.0001, "beta": 0.75, "k": 1}},
+        {"id": "dropout_1", "type": "Dropout", "params": {"p": 0.5}},
+        {"id": "identity_1", "type": "Identity", "params": {}},
+        {"id": "pool_1", "type": "AdaptiveAvgPool2d", "params": {"output_size": [1, 1]}},
+        {"id": "flatten_1", "type": "Flatten", "params": {"start_dim": 1}},
+        {"id": "softmax_1", "type": "Softmax", "params": {"dim": 1}},
+        {"id": "output_main", "type": "Output", "name": "main", "params": {}},
+    ],
+    "edges": [
+        {"source": "input_image", "target": "norm_1"},
+        {"source": "norm_1", "target": "dropout_1"},
+        {"source": "dropout_1", "target": "identity_1"},
+        {"source": "identity_1", "target": "pool_1"},
+        {"source": "pool_1", "target": "flatten_1"},
+        {"source": "flatten_1", "target": "softmax_1"},
+        {"source": "softmax_1", "target": "output_main"},
+    ],
+}
+
 
 class CompilerApiTests(unittest.TestCase):
     def test_options_preflight_is_allowed_for_compile(self) -> None:
@@ -165,6 +187,39 @@ class CompilerApiTests(unittest.TestCase):
         self.assertEqual(context.exception.status_code, 400)
         self.assertIn("Expected shape", context.exception.detail)
         self.assertIn("Actual shape", context.exception.detail)
+
+    def test_compile_supports_extended_module_and_function_nodes(self) -> None:
+        response = compile_graph(GraphRequest.model_validate(EXTENDED_NODE_GRAPH))
+
+        payload = response.model_dump()
+        code = payload["code"]
+        self.assertIn("self.norm_1 = nn.LocalResponseNorm(size=5, alpha=0.0001, beta=0.75, k=1)", code)
+        self.assertIn("self.dropout_1 = nn.Dropout(p=0.5)", code)
+        self.assertIn("self.identity_1 = nn.Identity()", code)
+        self.assertIn("self.pool_1 = nn.AdaptiveAvgPool2d(output_size=[1, 1])", code)
+        self.assertIn("t_softmax_1 = torch.softmax(t_flatten_1, dim=1)", code)
+        self.assertEqual(payload["shapes"]["norm_1"], [1, 64, 56, 56])
+        self.assertEqual(payload["shapes"]["pool_1"], [1, 64, 1, 1])
+        self.assertEqual(payload["shapes"]["softmax_1"], [1, 64])
+
+    def test_validate_requires_softmax_dim(self) -> None:
+        invalid_graph = {
+            "nodes": [
+                {"id": "input_1", "type": "Input", "name": "image", "params": {"shape": [1, 10]}},
+                {"id": "softmax_1", "type": "Softmax", "params": {}},
+                {"id": "output_1", "type": "Output", "name": "main", "params": {}},
+            ],
+            "edges": [
+                {"source": "input_1", "target": "softmax_1"},
+                {"source": "softmax_1", "target": "output_1"},
+            ],
+        }
+
+        with self.assertRaises(HTTPException) as context:
+            validate_graph(GraphRequest.model_validate(invalid_graph))
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertIn("dim", context.exception.detail)
 
 
 if __name__ == "__main__":
