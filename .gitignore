@@ -14,3 +14,5 @@ __pycache__/
 # 공통
 .env
 .DS_Store
+milestone.md
+milestone2.md

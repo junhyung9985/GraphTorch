@@ -15,6 +15,9 @@ SUPPORTED_NODE_TYPES = {
     "Conv2d",
     "Linear",
     "BatchNorm2d",
+    "LayerNorm",
+    "LSTM",
+    "GRU",
     "ReLU",
     "Dropout",
     "LocalResponseNorm",
@@ -33,6 +36,9 @@ MODULE_NODE_TYPES = {
     "Conv2d",
     "Linear",
     "BatchNorm2d",
+    "LayerNorm",
+    "LSTM",
+    "GRU",
     "ReLU",
     "Dropout",
     "LocalResponseNorm",
@@ -45,6 +51,9 @@ UNARY_NODE_TYPES = {
     "Conv2d",
     "Linear",
     "BatchNorm2d",
+    "LayerNorm",
+    "LSTM",
+    "GRU",
     "ReLU",
     "Dropout",
     "LocalResponseNorm",
@@ -130,6 +139,10 @@ class GraphCompiler:
                 self._require_params(node, {"in_features", "out_features"})
             elif node.type == "BatchNorm2d":
                 self._require_params(node, {"num_features"})
+            elif node.type == "LayerNorm":
+                self._require_params(node, {"normalized_shape"})
+            elif node.type in {"LSTM", "GRU"}:
+                self._require_params(node, {"input_size", "hidden_size", "num_layers", "batch_first", "bidirectional"})
             elif node.type == "LocalResponseNorm":
                 self._require_params(node, {"size"})
             elif node.type in {"MaxPool2d", "AvgPool2d"}:
@@ -216,6 +229,10 @@ class GraphCompiler:
                 shapes[node_id] = self._infer_linear(node, parent_shapes[0])
             elif node.type == "BatchNorm2d":
                 shapes[node_id] = self._infer_batch_norm(node, parent_shapes[0])
+            elif node.type == "LayerNorm":
+                shapes[node_id] = self._infer_layer_norm(node, parent_shapes[0])
+            elif node.type in {"LSTM", "GRU"}:
+                shapes[node_id] = self._infer_sequence_module(node, parent_shapes[0])
             elif node.type in {"ReLU", "Dropout", "LocalResponseNorm", "Identity"}:
                 shapes[node_id] = parent_shapes[0]
             elif node.type in {"MaxPool2d", "AvgPool2d"}:
@@ -265,6 +282,37 @@ class GraphCompiler:
         if input_shape[1] != int(node.params["num_features"]):
             raise ShapeInferenceError(f"BatchNorm2d node '{node.id}' expected {node.params['num_features']} features")
         return input_shape
+
+    def _infer_layer_norm(self, node: Node, input_shape: Shape) -> Shape:
+        normalized_shape = self._parse_shape(node.params["normalized_shape"], node.id)
+        if len(normalized_shape) > len(input_shape):
+            raise ShapeInferenceError(f"LayerNorm node '{node.id}' normalized_shape exceeds input rank")
+        if tuple(input_shape[-len(normalized_shape) :]) != normalized_shape:
+            raise ShapeInferenceError(
+                f"LayerNorm node '{node.id}' expected trailing shape {list(normalized_shape)} "
+                f"but received {list(input_shape[-len(normalized_shape) :])}."
+            )
+        return input_shape
+
+    def _infer_sequence_module(self, node: Node, input_shape: Shape) -> Shape:
+        if len(input_shape) != 3:
+            raise ShapeInferenceError(f"{node.type} node '{node.id}' expects a 3D input shape")
+        input_size = int(node.params["input_size"])
+        hidden_size = int(node.params["hidden_size"])
+        num_layers = int(node.params["num_layers"])
+        batch_first = self._coerce_bool(node.params["batch_first"], "batch_first", node.id)
+        bidirectional = self._coerce_bool(node.params["bidirectional"], "bidirectional", node.id)
+        if input_size <= 0 or hidden_size <= 0 or num_layers <= 0:
+            raise ShapeInferenceError(f"{node.type} node '{node.id}' requires positive input_size, hidden_size, and num_layers")
+        feature_dim = input_shape[2] if batch_first else input_shape[2]
+        if feature_dim != input_size:
+            raise ShapeInferenceError(f"{node.type} node '{node.id}' expected input_size {input_size} but received {feature_dim}")
+        directions = 2 if bidirectional else 1
+        if batch_first:
+            batch, seq_len, _ = input_shape
+            return (batch, seq_len, hidden_size * directions)
+        seq_len, batch, _ = input_shape
+        return (seq_len, batch, hidden_size * directions)
 
     def _infer_pool(self, node: Node, input_shape: Shape) -> Shape:
         if len(input_shape) != 4:
@@ -378,3 +426,10 @@ class GraphCompiler:
         if dim < 0 or dim >= rank:
             raise ShapeInferenceError(f"Node '{node_id}' references invalid dimension {dim}")
         return dim
+
+    def _coerce_bool(self, raw_value: object, field_name: str, node_id: str) -> bool:
+        if isinstance(raw_value, bool):
+            return raw_value
+        if isinstance(raw_value, int) and raw_value in {0, 1}:
+            return bool(raw_value)
+        raise ShapeInferenceError(f"Node '{node_id}' has an invalid {field_name} value")

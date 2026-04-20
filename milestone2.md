@@ -104,6 +104,13 @@ Support more model families using high-level nodes.
 * Avoid introducing loops or control flow
 * Preserve current DAG model
 
+#### Recurrence Handling Note
+
+* `LSTM` / `GRU` self-reference is **not** represented as a literal self-edge in the editor graph
+* Recurrent semantics should remain black-box in Milestone 1
+* True recurrence handling should be deferred to **Milestone 2**, where lowering/expansion can introduce time-step semantics without breaking the DAG editor model
+* Layer-name duplication alone is **not** a sufficient solution for recurrent structure
+
 ---
 
 ### Deliverables
@@ -153,6 +160,12 @@ Current:
 Future-ready:
 
 * normalize → **lower/expand** → validate → topo → shape → codegen
+
+This is the stage where recurrent/self-referential structures should be resolved:
+
+* editor graph stays acyclic
+* recurrent nodes may later lower into expanded step graphs or state-carrying internal representations
+* any future self-reference semantics for `LSTM` / `GRU` should be modeled here, not in the flat editor DAG directly
 
 ---
 

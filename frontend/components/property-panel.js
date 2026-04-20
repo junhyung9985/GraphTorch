@@ -17,6 +17,21 @@ const PARAM_FIELDS = {
     { key: "out_features", label: "Out Features", kind: "number" },
   ],
   BatchNorm2d: [{ key: "num_features", label: "Num Features", kind: "number" }],
+  LayerNorm: [{ key: "normalized_shape", label: "Normalized Shape", kind: "array" }],
+  LSTM: [
+    { key: "input_size", label: "Input Size", kind: "number" },
+    { key: "hidden_size", label: "Hidden Size", kind: "number" },
+    { key: "num_layers", label: "Layers", kind: "number" },
+    { key: "batch_first", label: "Batch First 0/1", kind: "number" },
+    { key: "bidirectional", label: "Bidirectional 0/1", kind: "number" },
+  ],
+  GRU: [
+    { key: "input_size", label: "Input Size", kind: "number" },
+    { key: "hidden_size", label: "Hidden Size", kind: "number" },
+    { key: "num_layers", label: "Layers", kind: "number" },
+    { key: "batch_first", label: "Batch First 0/1", kind: "number" },
+    { key: "bidirectional", label: "Bidirectional 0/1", kind: "number" },
+  ],
   ReLU: [],
   Dropout: [{ key: "p", label: "Drop Probability", kind: "number" }],
   LocalResponseNorm: [

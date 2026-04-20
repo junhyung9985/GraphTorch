@@ -107,6 +107,11 @@ export function getNodeSummary(node) {
       return `${params.in_features ?? "?"}\u2192${params.out_features ?? "?"}`;
     case "BatchNorm2d":
       return `features=${params.num_features ?? "?"}`;
+    case "LayerNorm":
+      return `norm=${formatArray(params.normalized_shape)}`;
+    case "LSTM":
+    case "GRU":
+      return `${params.input_size ?? "?"}\u2192${params.hidden_size ?? "?"}, layers=${params.num_layers ?? 1}`;
     case "Dropout":
       return `p=${params.p ?? "?"}`;
     case "LocalResponseNorm":
@@ -135,7 +140,7 @@ export function getNodeSummary(node) {
 
 export function getNodeBadge(nodeType) {
   const category = getCategory(nodeType);
-  if (category === "input") return { label: nodeType, className: "bg-teal-50 text-teal-700 ring-1 ring-teal-200" };
+  if (category === "io") return { label: nodeType, className: "bg-teal-50 text-teal-700 ring-1 ring-teal-200" };
   if (category === "functional") {
     return { label: nodeType, className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" };
   }

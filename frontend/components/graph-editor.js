@@ -35,6 +35,9 @@ const nodeTypes = {
   Conv2d: GraphNode,
   Linear: GraphNode,
   BatchNorm2d: GraphNode,
+  LayerNorm: GraphNode,
+  LSTM: GraphNode,
+  GRU: GraphNode,
   ReLU: GraphNode,
   Dropout: GraphNode,
   LocalResponseNorm: GraphNode,
@@ -499,7 +502,7 @@ export function GraphEditor() {
             </button>
             {isPresetsOpen ? (
               <div className="absolute left-0 top-10 z-20 w-72 rounded-2xl border border-border bg-white p-3 shadow-panel">
-                <div className="space-y-2">
+                <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
                   {PRESET_LIST.map((preset) => (
                     <button
                       key={preset.key}

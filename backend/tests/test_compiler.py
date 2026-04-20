@@ -50,6 +50,7 @@ EXTENDED_NODE_GRAPH = {
         {"id": "identity_1", "type": "Identity", "params": {}},
         {"id": "pool_1", "type": "AdaptiveAvgPool2d", "params": {"output_size": [1, 1]}},
         {"id": "flatten_1", "type": "Flatten", "params": {"start_dim": 1}},
+        {"id": "layernorm_1", "type": "LayerNorm", "params": {"normalized_shape": [64]}},
         {"id": "softmax_1", "type": "Softmax", "params": {"dim": 1}},
         {"id": "output_main", "type": "Output", "name": "main", "params": {}},
     ],
@@ -59,8 +60,105 @@ EXTENDED_NODE_GRAPH = {
         {"source": "dropout_1", "target": "identity_1"},
         {"source": "identity_1", "target": "pool_1"},
         {"source": "pool_1", "target": "flatten_1"},
-        {"source": "flatten_1", "target": "softmax_1"},
+        {"source": "flatten_1", "target": "layernorm_1"},
+        {"source": "layernorm_1", "target": "softmax_1"},
         {"source": "softmax_1", "target": "output_main"},
+    ],
+}
+
+SEQUENCE_GRAPH = {
+    "nodes": [
+        {"id": "input_seq", "type": "Input", "name": "tokens", "params": {"shape": [4, 12, 128]}},
+        {
+            "id": "lstm_1",
+            "type": "LSTM",
+            "params": {"input_size": 128, "hidden_size": 256, "num_layers": 2, "batch_first": 1, "bidirectional": 1},
+        },
+        {
+            "id": "gru_1",
+            "type": "GRU",
+            "params": {"input_size": 512, "hidden_size": 128, "num_layers": 1, "batch_first": 1, "bidirectional": 0},
+        },
+        {"id": "output_main", "type": "Output", "name": "main", "params": {}},
+    ],
+    "edges": [
+        {"source": "input_seq", "target": "lstm_1"},
+        {"source": "lstm_1", "target": "gru_1"},
+        {"source": "gru_1", "target": "output_main"},
+    ],
+}
+
+STACKED_LSTM_PRESET_GRAPH = {
+    "nodes": [
+        {"id": "input_seq", "type": "Input", "name": "tokens", "params": {"shape": [4, 20, 128]}},
+        {
+            "id": "lstm_1",
+            "type": "LSTM",
+            "params": {"input_size": 128, "hidden_size": 256, "num_layers": 3, "batch_first": 1, "bidirectional": 0},
+        },
+        {"id": "layernorm_1", "type": "LayerNorm", "params": {"normalized_shape": [256]}},
+        {"id": "output_main", "type": "Output", "name": "main", "params": {}},
+    ],
+    "edges": [
+        {"source": "input_seq", "target": "lstm_1"},
+        {"source": "lstm_1", "target": "layernorm_1"},
+        {"source": "layernorm_1", "target": "output_main"},
+    ],
+}
+
+SEQ2SEQ_LSTM_PRESET_GRAPH = {
+    "nodes": [
+        {"id": "source_seq", "type": "Input", "name": "source", "params": {"shape": [4, 20, 128]}},
+        {"id": "target_seq", "type": "Input", "name": "target", "params": {"shape": [4, 20, 128]}},
+        {
+            "id": "encoder_lstm",
+            "type": "LSTM",
+            "params": {"input_size": 128, "hidden_size": 128, "num_layers": 2, "batch_first": 1, "bidirectional": 1},
+        },
+        {"id": "merge_context", "type": "Concat", "params": {"dim": 2}},
+        {
+            "id": "decoder_lstm",
+            "type": "LSTM",
+            "params": {"input_size": 384, "hidden_size": 256, "num_layers": 1, "batch_first": 1, "bidirectional": 0},
+        },
+        {"id": "layernorm_1", "type": "LayerNorm", "params": {"normalized_shape": [256]}},
+        {"id": "output_main", "type": "Output", "name": "main", "params": {}},
+    ],
+    "edges": [
+        {"source": "source_seq", "target": "encoder_lstm"},
+        {"source": "encoder_lstm", "target": "merge_context"},
+        {"source": "target_seq", "target": "merge_context"},
+        {"source": "merge_context", "target": "decoder_lstm"},
+        {"source": "decoder_lstm", "target": "layernorm_1"},
+        {"source": "layernorm_1", "target": "output_main"},
+    ],
+}
+
+ENCODER_DECODER_GRU_PRESET_GRAPH = {
+    "nodes": [
+        {"id": "source_seq", "type": "Input", "name": "source", "params": {"shape": [4, 20, 128]}},
+        {"id": "target_seq", "type": "Input", "name": "target", "params": {"shape": [4, 20, 128]}},
+        {
+            "id": "encoder_gru",
+            "type": "GRU",
+            "params": {"input_size": 128, "hidden_size": 128, "num_layers": 2, "batch_first": 1, "bidirectional": 1},
+        },
+        {"id": "merge_context", "type": "Concat", "params": {"dim": 2}},
+        {
+            "id": "decoder_gru",
+            "type": "GRU",
+            "params": {"input_size": 384, "hidden_size": 128, "num_layers": 1, "batch_first": 1, "bidirectional": 0},
+        },
+        {"id": "layernorm_1", "type": "LayerNorm", "params": {"normalized_shape": [128]}},
+        {"id": "output_main", "type": "Output", "name": "main", "params": {}},
+    ],
+    "edges": [
+        {"source": "source_seq", "target": "encoder_gru"},
+        {"source": "encoder_gru", "target": "merge_context"},
+        {"source": "target_seq", "target": "merge_context"},
+        {"source": "merge_context", "target": "decoder_gru"},
+        {"source": "decoder_gru", "target": "layernorm_1"},
+        {"source": "layernorm_1", "target": "output_main"},
     ],
 }
 
@@ -197,9 +295,11 @@ class CompilerApiTests(unittest.TestCase):
         self.assertIn("self.dropout_1 = nn.Dropout(p=0.5)", code)
         self.assertIn("self.identity_1 = nn.Identity()", code)
         self.assertIn("self.pool_1 = nn.AdaptiveAvgPool2d(output_size=[1, 1])", code)
-        self.assertIn("t_softmax_1 = torch.softmax(t_flatten_1, dim=1)", code)
+        self.assertIn("self.layernorm_1 = nn.LayerNorm(normalized_shape=[64])", code)
+        self.assertIn("t_softmax_1 = torch.softmax(t_layernorm_1, dim=1)", code)
         self.assertEqual(payload["shapes"]["norm_1"], [1, 64, 56, 56])
         self.assertEqual(payload["shapes"]["pool_1"], [1, 64, 1, 1])
+        self.assertEqual(payload["shapes"]["layernorm_1"], [1, 64])
         self.assertEqual(payload["shapes"]["softmax_1"], [1, 64])
 
     def test_validate_requires_softmax_dim(self) -> None:
@@ -220,6 +320,65 @@ class CompilerApiTests(unittest.TestCase):
 
         self.assertEqual(context.exception.status_code, 400)
         self.assertIn("dim", context.exception.detail)
+
+    def test_validate_requires_layernorm_shape(self) -> None:
+        invalid_graph = {
+            "nodes": [
+                {"id": "input_1", "type": "Input", "name": "image", "params": {"shape": [1, 64]}},
+                {"id": "layernorm_1", "type": "LayerNorm", "params": {}},
+                {"id": "output_1", "type": "Output", "name": "main", "params": {}},
+            ],
+            "edges": [
+                {"source": "input_1", "target": "layernorm_1"},
+                {"source": "layernorm_1", "target": "output_1"},
+            ],
+        }
+
+        with self.assertRaises(HTTPException) as context:
+            validate_graph(GraphRequest.model_validate(invalid_graph))
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertIn("normalized_shape", context.exception.detail)
+
+    def test_compile_supports_sequence_nodes(self) -> None:
+        response = compile_graph(GraphRequest.model_validate(SEQUENCE_GRAPH))
+
+        payload = response.model_dump()
+        code = payload["code"]
+        self.assertIn("self.lstm_1 = nn.LSTM(input_size=128, hidden_size=256, num_layers=2, batch_first=True, bidirectional=True)", code)
+        self.assertIn("self.gru_1 = nn.GRU(input_size=512, hidden_size=128, num_layers=1, batch_first=True, bidirectional=False)", code)
+        self.assertIn("t_lstm_1 = self.lstm_1(tokens)[0]", code)
+        self.assertIn("t_gru_1 = self.gru_1(t_lstm_1)[0]", code)
+        self.assertEqual(payload["shapes"]["lstm_1"], [4, 12, 512])
+        self.assertEqual(payload["shapes"]["gru_1"], [4, 12, 128])
+
+    def test_validate_rejects_lstm_input_size_mismatch(self) -> None:
+        invalid_graph = {
+            "nodes": [
+                {"id": "input_seq", "type": "Input", "name": "tokens", "params": {"shape": [4, 12, 64]}},
+                {"id": "lstm_1", "type": "LSTM", "params": {"input_size": 128, "hidden_size": 256, "num_layers": 1, "batch_first": 1, "bidirectional": 0}},
+                {"id": "output_1", "type": "Output", "name": "main", "params": {}},
+            ],
+            "edges": [
+                {"source": "input_seq", "target": "lstm_1"},
+                {"source": "lstm_1", "target": "output_1"},
+            ],
+        }
+
+        with self.assertRaises(HTTPException) as context:
+            validate_graph(GraphRequest.model_validate(invalid_graph))
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertIn("input_size", context.exception.detail)
+
+    def test_compile_smoke_for_sequence_presets(self) -> None:
+        for graph in [STACKED_LSTM_PRESET_GRAPH, SEQ2SEQ_LSTM_PRESET_GRAPH, ENCODER_DECODER_GRU_PRESET_GRAPH]:
+            response = compile_graph(GraphRequest.model_validate(graph))
+            payload = response.model_dump()
+
+            self.assertTrue(payload["topological_order"])
+            self.assertTrue(payload["shapes"])
+            self.assertIn("class GeneratedModel", payload["code"])
 
 
 if __name__ == "__main__":
