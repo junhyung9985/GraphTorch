@@ -15,4 +15,5 @@ __pycache__/
 .env
 .DS_Store
 milestone.md
+milestones.md
 milestone2.md
